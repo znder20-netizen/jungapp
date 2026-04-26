@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Jung Faserwerke</title>
+
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #1A1F1B;
+  color: #E8E8E8;
+}
+
+h1, h2, h3 {
+  margin: 0 0 10px 0;
+  font-weight: 600;
+}
+
+button {
+  background: #4A7C59;
+  border: none;
+  padding: 10px 16px;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+}
+button:hover { background: #3d684a; }
+
+input, select, textarea {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0 14px 0;
+  border-radius: 6px;
+  border: 1px solid #333;
+  background: #111;
+  color: #eee;
+}
+
+.page { display: none; padding: 20px; }
+.page.active { display: block; }
+
+#nav {
+  display: flex;
+  background: #111;
+  border-bottom: 1px solid #333;
+}
+.tab {
+  padding: 14px 20px;
+  cursor: pointer;
+  color: #ccc;
+}
+.tab.active {
+  background: #4A7C59;
+  color: white;
+}
+
+#dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.dashboard-card {
+  background: #222;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 18px;
+  border: 1px solid #333;
+}
+.dashboard-card span {
+  font-size: 26px;
+  font-weight: bold;
+}
+
+.list-item {
+  background: #222;
+  padding: 14px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  border: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  display: inline-block;
+  margin-top: 4px;
+}
+.badge-pilot { background: #4CAF50; color: white; }
+.badge-serie { background: #2196F3; color: white; }
+.badge-int { background: #FFC107; color: black; }
+
+.offer-card {
+  background: #222;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid #333;
+  margin-bottom: 12px;
+}
+
+#panelOverlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: none;
+}
+#panelOverlay.open { display: block; }
+
+#panel {
+  position: fixed;
+  top: 0; right: -500px;
+  width: 420px;
+  height: 100%;
+  background: #1A1F1B;
+  border-left: 1px solid #333;
+  padding: 20px;
+  overflow-y: auto;
+  transition: 0.3s ease;
+}
+#panel.open { right: 0; }
+
+.panel-close {
+  float: right;
+  cursor: pointer;
+  font-size: 22px;
+  color: #aaa;
+}
+.panel-close:hover { color: white; }
+</style>
+</head>
+<body>
+
+<div id="nav">
+  <div class="tab active" onclick="showPage('dashboard')">Dashboard</div>
+  <div class="tab" onclick="showPage('kunden')">Kunden</div>
+  <div class="tab" onclick="showPage('angebote')">Angebote</div>
+  <div class="tab" onclick="showPage('produkte')">Produkte</div>
+  <div class="tab" onclick="showPage('materialien')">Materialien</div>
+  <div class="tab" onclick="showPage('formen')">Formen</div>
+  <div class="tab" onclick="showPage('parameter')">Parameter</div>
+</div>
+
+<div id="dashboard" class="page active">
+  <h1>Dashboard</h1>
+  <div id="dashboardGrid"></div>
+  <h2 style="margin-top:30px;">Diagramme</h2>
+  <canvas id="chartKapazitaet" height="120"></canvas>
+  <canvas id="chartMaterialkosten" height="120" style="margin-top:30px;"></canvas>
+  <canvas id="chartAngeboteKunden" height="120" style="margin-top:30px;"></canvas>
+</div>
+
+<div id="kunden" class="page">
+  <h1>Kunden</h1>
+  <button onclick="openPanel('kunde', null)">+ Neuer Kunde</button>
+  <div id="kundenList" style="margin-top:20px;"></div>
+</div>
+
+<div id="angebote" class="page">
+  <h1>Angebote</h1>
+  <button onclick="openPanel('angebot', null)">+ Neues Angebot</button>
+  <div id="angeboteList" style="margin-top:20px;"></div>
+</div>
+
+<div id="produkte" class="page">
+  <h1>Produkte</h1>
+  <button onclick="openPanel('produkt', null)">+ Neues Produkt</button>
+  <div id="produktList"></div>
+</div>
+
+<div id="materialien" class="page">
+  <h1>Materialien</h1>
+  <button onclick="openPanel('material', null)">+ Neues Material</button>
+  <div id="materialList"></div>
+</div>
+
+<div id="formen" class="page">
+  <h1>Formen</h1>
+  <button onclick="openPanel('form', null)">+ Neue Form</button>
+  <div id="formList"></div>
+</div>
+
+<div id="parameter" class="page">
+  <h1>Parameter</h1>
+  <button onclick="exportData()">Daten exportieren</button>
+  <input type="file" id="importFile" onchange="importData(event)" style="margin-top:20px;">
+  <div class="card" style="margin-top:20px;">
+    <label>Strompreis (€/kWh)</label>
+    <input id="paramEnergy" type="number" step="0.01">
+    <label>Standard-Stundensatz (€/h)</label>
+    <input id="paramWage" type="number" step="0.5">
+    <label>Maschinenkosten (€/h)</label>
+    <input id="paramMachine" type="number" step="0.5">
+    <button onclick="saveParams()">Speichern</button>
+  </div>
+</div>
+
+<div id="panelOverlay">
+  <div id="panel">
+    <span class="panel-close" onclick="closePanel()">✕</span>
+    <h2 id="panelTitle"></h2>
+    <div id="panelContent"></div>
+  </div>
+</div><script>
+/* -----------------------------------------
+   VERSIONING & STORAGE
+----------------------------------------- */
+const APP_VERSION = "2.0";
+const LS_KEY = "jfAppDataV2";
+
+/* -----------------------------------------
+   GLOBAL DATA STRUCTURES
+----------------------------------------- */
+let kunden = [];
+let angebote = [];
+let produkte = [];
+let materialien = [];
+let formen = [];
+let params = {
+  energyPrice: 0.32,
+  defaultWage: 14,
+  machineCostPerHour: 20
+};
+
+/* -----------------------------------------
+   LOAD / SAVE
+----------------------------------------- */
+function save() {
+  const data = {
+    version: APP_VERSION,
+    kunden,
+    angebote,
+    produkte,
+    materialien,
+    formen,
+    params
+  };
+  localStorage.setItem(LS_KEY, JSON.stringify(data));
+}
+
+function load() {
+  const raw = localStorage.getItem(LS_KEY);
+  if (!raw) return;
+
+  try {
+    const d = JSON.parse(raw);
+    kunden = d.kunden || [];
+    angebote = d.angebote || [];
+    produkte = d.produkte || [];
+    materialien = d.materialien || [];
+    formen = d.formen || [];
+    params = d.params || params;
+  } catch (e) {
+    console.error("Load error", e);
+  }
+}
+load();
+
+/* -----------------------------------------
+   DEFAULT DATA
+----------------------------------------- */
+if (materialien.length === 0) {
+  materialien = [
+    {id:1,name:"Stroh",fiberPrice:0.4,fiberGrams:5,binderName:"Stärke",binderPrice:1,binderGrams:1,additiveName:"",additivePrice:0,additiveGrams:0},
+    {id:2,name:"Gras",fiberPrice:0.6,fiberGrams:5,binderName:"Zelluloseleim",binderPrice:2,binderGrams:0.5,additiveName:"",additivePrice:0,additiveGrams:0},
+    {id:3,name:"Hanf",fiberPrice:1.2,fiberGrams:4,binderName:"Lignin",binderPrice:3,binderGrams:0.5,additiveName:"",additivePrice:0,additiveGrams:0},
+    {id:4,name:"Karton",fiberPrice:0.5,fiberGrams:6,binderName:"",binderPrice:0,binderGrams:0,additiveName:"Bienenwachs",additivePrice:2,additiveGrams:0.2},
+    {id:5,name:"Holzfasern",fiberPrice:0.8,fiberGrams:5,binderName:"",binderPrice:0,binderGrams:0,additiveName:"",additivePrice:0,additiveGrams:0}
+  ];
+}
+
+if (formen.length === 0) {
+  formen = [
+    {id:1,name:"Silikon",lifetime:500,price:40},
+    {id:2,name:"Holz",lifetime:1500,price:60},
+    {id:3,name:"PLA",lifetime:250,price:30},
+    {id:4,name:"PETG",lifetime:500,price:40},
+    {id:5,name:"Alu",lifetime:10000,price:200}
+  ];
+}
+
+if (produkte.length === 0) {
+  produkte = [
+    {id:1,name:"Kleine Schale",materialId:1,formId:1,energyKwh:0.004,minutesPerPart:0.6,hourlyWage:14,expertiseMargin:0.30,targetPrice:0.30},
+    {id:2,name:"Mittlere Schale",materialId:5,formId:2,energyKwh:0.004,minutesPerPart:0.6,hourlyWage:14,expertiseMargin:0.30,targetPrice:0.40},
+    {id:3,name:"Große Schale",materialId:3,formId:5,energyKwh:0.004,minutesPerPart:0.7,hourlyWage:14,expertiseMargin:0.30,targetPrice:0.50}
+  ];
+}
+
+/* -----------------------------------------
+   GENERATORS
+----------------------------------------- */
+function generateKundenCode(firma) {
+  if (!firma) return "KUNDE";
+  let clean = firma
+    .replace(/GmbH|UG|AG|KG|mbH/gi, "")
+    .replace(/[^a-zA-Z]/g, "")
+    .toUpperCase()
+    .substring(0, 10);
+  return clean || "KUNDE";
+}
+
+function generateAngebotsNummer(kundenCode) {
+  const year = new Date().getFullYear();
+  let max = 0;
+
+  angebote.forEach(a => {
+    if (a.nummer && a.nummer.includes(`${kundenCode}-${year}-`)) {
+      const nr = parseInt(a.nummer.split("-")[2]);
+      if (nr > max) max = nr;
+    }
+  });
+
+  const next = (max + 1).toString().padStart(4, "0");
+  return `${kundenCode}-${year}-${next}`;
+}
+
+/* -----------------------------------------
+   COST CALCULATIONS
+----------------------------------------- */
+function materialKostenTeil(m) {
+  const f = m.fiberPrice * (m.fiberGrams/1000);
+  const b = m.binderPrice * (m.binderGrams/1000);
+  const a = m.additivePrice * (m.additiveGrams/1000);
+  return f + b + a;
+}
+
+function formVerschleissTeil(f) {
+  return f.price / f.lifetime;
+}
+
+function basisKosten(p) {
+  const m = materialien.find(x=>x.id===p.materialId);
+  const f = formen.find(x=>x.id===p.formId);
+
+  const mat = materialKostenTeil(m);
+  const energy = (p.energyKwh||0) * params.energyPrice;
+  const arbeit = ((p.minutesPerPart||0)/60) * (p.hourlyWage||params.defaultWage);
+  const form = formVerschleissTeil(f);
+  const maschine = ((p.minutesPerPart||0)/60) * params.machineCostPerHour;
+
+  return mat + energy + arbeit + form + maschine;
+}
+
+function einzelPreis(p) {
+  return basisKosten(p) * (1 + (p.expertiseMargin||0));
+}
+
+function stueckProStunde(p) {
+  return 60 / p.minutesPerPart;
+}
+
+/* -----------------------------------------
+   NAVIGATION
+----------------------------------------- */
+function showPage(id) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  event.target.classList.add("active");
+
+  updateDashboard();
+}
+
+/* -----------------------------------------
+   PANEL OPEN/CLOSE
+----------------------------------------- */
+let currentPanel = null;
+
+function openPanel(type, id) {
+  currentPanel = {type, id};
+  document.getElementById("panelOverlay").classList.add("open");
+  document.getElementById("panel").classList.add("open");
+  renderPanelContent(type, id);
+}
+
+function closePanel() {
+  document.getElementById("panelOverlay").classList.remove("open");
+  document.getElementById("panel").classList.remove("open");
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closePanel();
+});
+</script>
+
+<!-- -----------------------------------------
+     PWA META + ICONS
+----------------------------------------- -->
+<link rel="icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#4A7C59">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+</body>
+</html>
