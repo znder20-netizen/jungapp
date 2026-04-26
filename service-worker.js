@@ -32,6 +32,19 @@ self.addEventListener("activate", event => {
   self.clients.claim();
 });
 
+// MESSAGE — Cache-Verwaltung über Nachrichten
+self.addEventListener("message", event => {
+  if (event.data && event.data.type === "CLEAR_CACHE") {
+    caches.keys().then(keys => {
+      Promise.all(
+        keys.map(key => caches.delete(key))
+      ).then(() => {
+        event.ports[0].postMessage({ success: true });
+      });
+    });
+  }
+});
+
 // FETCH — Network first, Fallback Cache
 self.addEventListener("fetch", event => {
   const req = event.request;
